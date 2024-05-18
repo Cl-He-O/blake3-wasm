@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+
+<body>
+  <label for="data">Data:</label>
+
+  <textarea id="data" name="data" oninput="update()"></textarea>
+
+  <p id="digest"></p>
+
+  <script src="./blake3.js"></script>
+  <script>
+    function hex(data) {
+      if (typeof (data) == "string") {
+        data = (new TextEncoder()).encode(data);
+      }
+      data = String.fromCharCode(...data);
+
+      h = "";
+      for (var i = 0; i < data.length; i++) {
+        h += data.charCodeAt(i).toString(16);
+      };
+      return h;
+    }
+
+    async function update() {
+      const data = document.getElementById("data").value;
+      const data_u8 = new TextEncoder().encode(data);
+
+      const d = await blake3.digest(data_u8);
+
+      document.getElementById("digest").innerText = hex(d);
+    }
+  </script>
+</body>
