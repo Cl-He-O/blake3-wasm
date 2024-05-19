@@ -2,15 +2,17 @@ import { decodeWasm } from "./dist/blake3_raw";
 
 let wasm: any = null;
 let exports: any = null;
+let buffer: any = null;
 
 const heap_set = (array: Uint8Array, p: any) => {
-  (new Uint8Array(exports.memory.buffer, p, array.length)).set(array, 0);
+  buffer.set(array, p);
 }
 
 export async function createHasher(key: null | Uint8Array = null) {
   if (!wasm) {
     wasm = await WebAssembly.instantiate(decodeWasm(), {});
     exports = wasm.instance.exports;
+    buffer = new Uint8Array(exports.memory.buffer);
   }
 
   return new Hasher(key)
@@ -18,12 +20,8 @@ export async function createHasher(key: null | Uint8Array = null) {
 
 export async function digest(data: Uint8Array, out_len: number = 32) {
   const hasher = await createHasher();
-
-  await hasher.update(data);
-  const digest = hasher.finalize(out_len);
-  hasher.free();
-
-  return digest;
+  hasher.update(data);
+  return hasher.finalize(out_len);
 }
 
 class Hasher {
@@ -47,7 +45,7 @@ class Hasher {
     }
   }
 
-  async update(data: Uint8Array) {
+  update(data: Uint8Array) {
     const data_ptr = exports.malloc(data.length);
     heap_set(data, data_ptr);
     exports.blake3_hasher_update(this.hasher, data_ptr, data.length);
@@ -58,12 +56,10 @@ class Hasher {
     const digest_ptr = exports.malloc(out_len);
     exports.blake3_hasher_finalize(this.hasher, digest_ptr, out_len);
     const digest = new Uint8Array(exports.memory.buffer, digest_ptr, out_len);
+
     exports.free(digest_ptr);
+    exports.free(this.hasher);
 
     return digest;
-  }
-
-  free() {
-    exports.free(this.hasher);
   }
 }
