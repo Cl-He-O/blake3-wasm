@@ -1,6 +1,5 @@
 BLAKE3 = BLAKE3/c
-EMCC = /usr/lib/emscripten/emcc
-CMD = $(EMCC) -O3 \
+CMD = emcc -O3 \
 	--no-entry \
 	-s TOTAL_MEMORY=64MB \
 	-s EXPORTED_FUNCTIONS='["_malloc","_free"]' \

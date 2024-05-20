@@ -5,24 +5,25 @@
   <input id="selector_file" type="file" />
   <br>
 
-  <p id="file_digest"></p>
+  <tt>
+    <p id="file_digest"></p>
+  </tt>
   <p id="throughput"></p>
   <br>
 
   <textarea id="input_text" name="data" oninput="update()"></textarea>
-  <p id="digest"></p>
+  <tt>
+    <p id="digest"></p>
+  </tt>
 
   <script src="./bundle.umd.js"></script>
   <script>
     function hex(data) {
-      if (typeof (data) == "string") {
-        data = (new TextEncoder()).encode(data);
-      }
-      data = String.fromCharCode(...data);
+      const s = String.fromCharCode(...data);
 
       h = "";
-      for (var i = 0; i < data.length; i++) {
-        h += data.charCodeAt(i).toString(16);
+      for (var i = 0; i < s.length; i++) {
+        h += s.charCodeAt(i).toString(16).padStart(2, "0");
       };
       return h;
     }
@@ -35,23 +36,28 @@
 
       let reader = new FileReader();
 
-      const update_chunk = (chunk) => {
-        return new Promise(
-          (resolve, reject) => {
+      const read_while_update = (last_chunk, file_slice) => {
+        return Promise.all([
+          new Promise((resolve, _) => {
+            hasher.update(last_chunk);
+            resolve();
+          }),
+          new Promise((resolve, _) => {
+            reader.readAsArrayBuffer(file_slice);
             reader.onload = (e) => {
-              hasher.update(new Uint8Array(e.target.result));
-              resolve();
+              resolve(e.target.result);
             }
-            reader.readAsArrayBuffer(chunk);
-          }
-        )
+          })
+        ]).then((res) => new Uint8Array(res[1]));
       }
 
+      const offset = file.size - n * CHUNK_SIZE;
+      let chunk = await read_while_update(new Uint8Array(0), file.slice(0, offset));
 
       for (let i = 0; i < n; i++) {
-        await update_chunk(file.slice(i * CHUNK_SIZE, i * CHUNK_SIZE + CHUNK_SIZE));
+        chunk = await read_while_update(chunk, file.slice(i * CHUNK_SIZE + offset, (i + 1) * CHUNK_SIZE + offset));
       }
-      await update_chunk(file.slice(n * CHUNK_SIZE, file.size));
+      hasher.update(chunk);
 
       return hasher.finalize();
     }
